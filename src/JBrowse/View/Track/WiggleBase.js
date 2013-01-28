@@ -2,12 +2,13 @@ define( [
             'dojo/_base/declare',
             'dojo/_base/array',
             'dojo/on',
+            'dojo/query',
             'JBrowse/View/Track/Canvas',
             'JBrowse/View/Track/ExportMixin',
             'JBrowse/Util',
             'JBrowse/Digest/Crc32'
         ],
-        function( declare, array, on, CanvasTrack, ExportMixin, Util, Digest ) {
+        function( declare, array, on, query, CanvasTrack, ExportMixin, Util, Digest ) {
 var Wiggle = declare( CanvasTrack, {
     constructor: function( args ) {
         this.store = args.store;
@@ -332,6 +333,10 @@ Wiggle.extend({
         var outTimeout;
         dojo.forEach( [canvas,verticalLine,scoreDisplay], function(element) {
             on( element, 'mousemove', dojo.hitch(this,function(evt) {
+                    // clear all old flags before starting
+                    dojo.query('.wiggleValueDisplay').forEach(function(node){node.style.display = 'none';});
+                    dojo.query('.wigglePositionIndicator').forEach(function(node){node.style.display = 'none';});
+
                     var cPos = dojo.position(canvas);
                     var x = evt.pageX;
                     var cx = evt.pageX - cPos.x;
@@ -339,6 +344,7 @@ Wiggle.extend({
                     verticalLine.style.display = 'block';
                     verticalLine.style.left = x+'px';
                     verticalLine.style.top = cPos.y+'px';
+
                     if( this._showPixelValue( scoreDisplay, pixelValues[Math.round(cx)] ) ) {
                         scoreDisplay.style.left = x+'px';
                         scoreDisplay.style.top = cPos.y+'px';
@@ -348,14 +354,14 @@ Wiggle.extend({
                     }
             }));
         },this);
-        on( block, 'mouseout', function(evt) {
-                var target = evt.srcElement || evt.target;
-                var evtParent = evt.relatedTarget || evt.toElement;
-                if( !target || !evtParent || target.parentNode != evtParent.parentNode) {
+        on (this.browser.view.trackContainer, 'mousemove', dojo.hitch(this, function(evt) {
+                var cPos = dojo.position(canvas);
+                var y = evt.pageY - cPos.y;
+                if ( y < 0 || y > cPos.Height) {
                     scoreDisplay.style.display = 'none';
                     verticalLine.style.display = 'none';
                 }
-        });
+        }));
     },
 
     _showPixelValue: function( scoreDisplay, score ) {
