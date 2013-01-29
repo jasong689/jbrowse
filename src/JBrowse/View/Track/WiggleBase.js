@@ -354,6 +354,14 @@ Wiggle.extend({
                     }
             }));
         },this);
+        on( block, 'mouseout', function(evt) {
+                var target = evt.srcElement || evt.target;
+                var evtParent = evt.relatedTarget || evt.toElement;
+                if( !target || !evtParent || target.parentNode != evtParent.parentNode ) {
+                    scoreDisplay.style.display = 'none';
+                    verticalLine.style.display = 'none';
+                }
+        });
         on (this.browser.view.trackContainer, 'mousemove', dojo.hitch(this, function(evt) {
                 var cPos = dojo.position(canvas);
                 var y = evt.pageY - cPos.y;
