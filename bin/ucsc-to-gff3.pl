@@ -3,6 +3,7 @@ use Getopt::Long;
 use Bio::GFF3::LowLevel qw/ gff3_format_feature /;
 use PerlIO::gzip;
 use IO::Handle;
+use Time::HiRes;
 
 use strict;
 use warnings;
@@ -31,6 +32,10 @@ example:
 	    --getSubfeatures
 =cut
 
+
+select(STDOUT);
+$|++;
+my $start = gettimeofday();
 
 my ($primaryTable,$secondaryTable,@link);
 my $trackdb = "trackDb";
@@ -81,17 +86,18 @@ unless( -f "$indir/$primaryTable.sql" && -f "$indir/$primaryTable.txt.gz" ) {
 
 #retrieves all data from the primary table
 my %primFields = name2column_map($indir . "/" . $primaryTable);
-my $primData = selectall($primaryTable, sub {$_});
+my $primData = selectall($indir . "/" . $primaryTable, sub {$_});
+my $entries = scalar @$primData;
 
-#retrieves the index number of the linking field in the secondary table
+#retrieves secondary table data
 #and checks if sql and txt.gz files exist
-my (%secFields,$matchIndex);
+my (%secFields, $secData);
 if ($secondaryTable) {
     unless( -f "$indir/$secondaryTable.sql" && -f "$indir/$secondaryTable.txt.gz" ) {
 	die "To format the $secondaryTable track, you must have both files $indir/$secondaryTable.sql and $indir/$secondaryTable.txt.gz\n";
     }
     %secFields = name2column_map($indir . "/" . $secondaryTable);
-    $matchIndex = $secFields{$link[1]} or die "--link is required if --secondaryTable is used";
+    $secData = selectall($indir . "/" . $secondaryTable, sub {$_});
 }
 
 #checks for left over fields to be written as attributes
@@ -101,7 +107,7 @@ my @leftOver = grep {not $_ ~~ @gff3Required} keys %primFields;
 
 open my $gff3, ">$out/$primaryTable.gff3" or die "Could not create $out/$primaryTable.gff3";
 
-print $gff3 "##gff-version 3";
+print $gff3 "##gff-version 3\n";
 
 foreach my $row (@$primData) {
     my $rowData = arrayref2hash($row, \%primFields);
@@ -109,8 +115,8 @@ foreach my $row (@$primData) {
     #adds attributes to hash ref from the secondary table if it is specified
     #selects rows which have matching data
     if ($secondaryTable) {
-        my $matchData = selectall($indir . "/" . $secondaryTable, sub{$_[0]->[$matchIndex] eq $rowData->{$link[0]}});
-        foreach my $linkRow (@$matchData) {
+	my @matchData = grep {$_->[$secFields{$link[1]}] ~~ $rowData->{$link[0]}} @$secData;
+        foreach my $linkRow (@matchData) {
             my $matchRow = arrayref2hash($linkRow, \%secFields);
 	    #switches name attribute with primary name if it exists in the secondary table
 	    #else switches with primary name found in the primary table
@@ -167,8 +173,10 @@ foreach my $row (@$primData) {
 	    }
 	}
     }
-    if (++$count % 10000 == 0) { warn "(processed $count lines)\n" }
+    print "\rProcessing ",++$count," of $entries entries";
 }
+my $elapsed = tv_interval($start);
+print "\nDone\nTotal time: $elapsed\n";
 close $gff3 or die "Could not close $out/$primaryTable.gff3";
 
 #Reusing some of Robs subroutines to make parsing the sql and txt.gz
