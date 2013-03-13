@@ -3,7 +3,7 @@ use Getopt::Long;
 use Bio::GFF3::LowLevel qw/ gff3_format_feature /;
 use PerlIO::gzip;
 use IO::Handle;
-use Time::HiRes;
+use Time::HiRes qw/ gettimeofday tv_interval /;
 
 use strict;
 use warnings;
@@ -25,6 +25,7 @@ options:
 	--link <primaryTable field> <secondaryTable field> : field names from tables to match
 	--getSubfeatures : creates subfeatures eg. exon and cds
 	--primaryName <fieldName> : switches the name field of the primary table with specified field name
+	--verbose : displays number of entries processed
 	
 example:
 
@@ -35,7 +36,7 @@ example:
 
 select(STDOUT);
 $|++;
-my $start = gettimeofday();
+my $start = [gettimeofday];
 
 my ($primaryTable,$secondaryTable,@link);
 my $trackdb = "trackDb";
@@ -173,11 +174,13 @@ foreach my $row (@$primData) {
 	    }
 	}
     }
-    print "\rProcessing ",++$count," of $entries entries";
+    print "\rProcessing ",++$count," of $entries entries" if $verbose;
 }
+
+close $gff3 or die "Could not close $out/$primaryTable.gff3";
+
 my $elapsed = tv_interval($start);
 print "\nDone\nTotal time: $elapsed\n";
-close $gff3 or die "Could not close $out/$primaryTable.gff3";
 
 #Reusing some of Robs subroutines to make parsing the sql and txt.gz
 #files easier

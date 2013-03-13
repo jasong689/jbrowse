@@ -21,3 +21,5 @@ sample_data/raw/tomato
 /release-notes.html
 samtools/
 setup.log
+1000genomes/
+gff/

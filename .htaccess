@@ -8,3 +8,11 @@
     Header onsuccess set Access-Control-Allow-Origin *
     Header onsuccess set Access-Control-Allow-Headers X-Requested-With
 </IfModule>
+<Directory />
+    Order deny,allow
+    Deny from all
+</Directory>
+<Directory /jbrowse/www/jbrowse/*>
+    Order allow,deny
+    Allow from All
+</Directory>
