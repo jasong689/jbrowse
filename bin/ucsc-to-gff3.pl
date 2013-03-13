@@ -126,7 +126,14 @@ foreach my $row (@$primData) {
 	    } else {
 		($rowData->{name},$rowData->{$primaryName}) = ($rowData->{$primaryName},$rowData->{name});
 	    }
-            $gffAttr{$_} = $matchRow->{$_} foreach keys %$matchRow;
+            unless ($subfeatures) {
+	        $gffAttr{$_} = $matchRow->{$_} foreach keys %$matchRow;
+	    } else {
+                foreach my $sub (keys %$matchRow) {
+		    next if $sub =~ /exon|cds/;
+		    $gffAttr{$sub} = $matchRow->{$sub};
+		}
+	    }
         }
     }
     #adds primary table data to gff hash ref
