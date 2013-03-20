@@ -5,10 +5,23 @@ use DBI;
 use Getopt::Long;
 use Bio::GFF3::LowLevel qw/ gff3_format_feature /;
 
-#ucsc-to-json.pl
-#queries ucsc public MySQL and creates a GFF3 file based on the options below
-#options --primaryTable <table name> --secondaryTable <table name> --link <primaryTable column:secondaryTable column> --primaryName <column name>
-#link is the condition by which to link the two tables
+=usage
+
+ucsc-to-json.pl
+
+Queries UCSC public MySQL and creates a GFF3 file based on the options below. Can combine data from
+two separate tables, however the first table must contain track data.
+
+Options:
+
+    --primaryTable <table name>
+    --secondaryTable <table name>
+    --link <primaryTable column> <secondaryTable column>
+    --primaryName <column name>
+    --out <dir>
+
+
+=cut
 
 my $db = "hg19";
 my $user = "genome";
@@ -18,18 +31,16 @@ my $password = "";
 my ($primaryTable,$secondaryTable,$sqlQuery);
 my $primaryName = 'name';
 my $out = '';
-my $link = '';
+my @link;
 my $count = 0;
 my $verbose = 0;
 
 GetOptions('primaryTable=s' => \$primaryTable,
            'secondaryTable=s' => \$secondaryTable,
-           'link=s' => \$link,
+           'link=s{2}' => \@link,
            'primaryName=s' => \$primaryName,
            'out=s' => \$out,
            'verbose' => \$verbose);
-
-my @link = split /:/, $link;
 
 #executes MySQL query based on entered options
 my $dbh = DBI->connect("DBI:mysql:$db:$host", $user, $password);
@@ -46,7 +57,7 @@ my $validquery = $sth->execute or die "Problem executing: " . DBI->errstr;
 my @fields = @{$sth->{NAME}};
 
 #by default gff3 file is created within the working directory
-open my $gff3, ">$out$primaryTable.gff3" or die "Could not create $primaryTable.gff3";
+open my $gff3, ">$out/$primaryTable.gff3" or die "Could not create $primaryTable.gff3";
 
 print $gff3 "##gff-version\t3\n";
 
@@ -108,7 +119,7 @@ while (my $databases = $sth->fetchrow_hashref()){
                     strand => $$databases{strand},
                     phase => undef,
                     attributes => {
-                        Parent => $$databases{name}
+                        Parent => $attributes{ID}
                     }
                 };
                 print $gff3 gff3_format_feature($hashRef);
