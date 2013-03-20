@@ -113,6 +113,7 @@ print $gff3 "##gff-version 3\n";
 foreach my $row (@$primData) {
     my $rowData = arrayref2hash($row, \%primFields);
     my %gffAttr;
+    $gffAttr{ID} = $rowData->{name};
     #adds attributes to hash ref from the secondary table if it is specified
     #selects rows which have matching data
     if ($secondaryTable) {
@@ -174,7 +175,7 @@ foreach my $row (@$primData) {
 		    strand => $rowData->{strand},
 		    phase => $rowData->{phase} || ".",
 		    attributes => {
-			Parent => $rowData->{name}
+			Parent => $gffAttr{ID}
 		    }
 		};
 	    print $gff3 gff3_format_feature($subHashRef);
