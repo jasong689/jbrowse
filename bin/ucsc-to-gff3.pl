@@ -8,24 +8,66 @@ use Time::HiRes qw/ gettimeofday tv_interval /;
 use strict;
 use warnings;
 
-=usage
+=head1 NAME
 
-ucsc-to-json.pl
+ucsc-to-gff3.pl - formats UCSC data dumps into GFF3
+
+=head1 DESCRIPTION
 
 Uses uscsc data dumps and converts them into a GFF3 file.
 Can be used to include data from two tables based on some condition, however primary table
 must contain track data. Secondary table does not need to be found in trackDb.
 
-options:
+=head1 USAGE
 
-	--primaryTable <tableName> : must be included is the primary table containing track data
-	--dir <dir> : directory where uscsc data dumps are located (default is current directory)
-	--out <dir> : output directory where GFF3 file will be created (default is current directory)
-	--secondaryTable <tableName> : data from a secondary table to be included with the primary table (must be used with --link)
-	--link <primaryTable field> <secondaryTable field> : field names from tables to match
-	--getSubfeatures : creates subfeatures eg. exon and cds
-	--primaryName <fieldName> : switches the name field of the primary table with specified field name
-	--verbose : displays number of entries processed
+	--primaryTable <tableName>
+	--dir <dir>
+	--out <dir>
+	--secondaryTable <tableName>
+	--link <primaryTable field> <secondaryTable field>
+	--getSubfeatures
+	--primaryName <fieldName>
+	--verbose
+
+=head1 OPTIONS
+
+=over4
+
+=item --primaryTable <tableName>
+
+The primary ucsc table to format into gff3. This table must include track data.
+
+=item --dir <dir>
+
+The directory where the database dumps are found. Default is current directory
+
+=item --out <dir>
+
+The directory to output the gff3 file. Default is current directory
+
+=item --secondaryTable <tableName>
+
+Data from a second table to include in gff3 file. (Optional)
+
+=item --link <primaryTable field> <secondaryTable field>
+
+Fields by which to link the primary and secondary table. (Required if --secondaryTable is used)
+
+=item --getSubfeatures
+
+Includes subfeatures in the gff3 file. (Optional)
+
+=item --primaryName <fieldName>
+
+Use a different field as the name for each feature. (Optional)
+
+=item --verbose
+
+Indicates how many rows have been processed
+
+=back
+
+=head1 EXAMPLE
 	
 example:
 
