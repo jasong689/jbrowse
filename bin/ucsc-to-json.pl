@@ -17,6 +17,7 @@ ucsc-to-json.pl - format JBrowse JSON from a UCSC database dump
       [ --clientConfig <JSON client config> ]        \
       [ --nclChunk <NCL chunk size in bytes> ]       \
       [ --compress ]                                 \
+      [ --key <key>]                                 \
       [ --sortMem <sort memory size> ]
 
 =head1 OPTIONS
@@ -75,6 +76,10 @@ If passed, compress the output with gzip, making .jsonz files.  This
 can save a lot of disk space on the server, but serving these files to
 JBrowse requires some web server configuration.
 
+=item --key <key>
+
+Defines a human readable track name
+
 =item --sortMem <bytes>
 
 The amount of RAM in bytes to use for sorting.
@@ -126,6 +131,8 @@ my $primaryNameColumn = 'name';
 my $sortMem = 1024 * 1024 * 512;
 my $help;
 my $quiet;
+my $keys;
+my $count = 0;
 GetOptions(
     "in=s"                => \$indir,
     "out=s"               => \$outdir,
@@ -140,6 +147,7 @@ GetOptions(
     "sortMem=i"           => \$sortMem,
     "help|?|h"            => \$help,
     "q|quiet"             => \$quiet,
+    "key=s@"               => \$keys  
 ) or pod2usage();
 
 pod2usage( -verbose => 2 ) if $help;
@@ -212,7 +220,7 @@ foreach my $tableName (@$tracks) {
                         $trackMeta->{colorR},
                         $trackMeta->{colorG},
                         $trackMeta->{colorB});
-
+    
     my $trackConfig =
       {
        compress => $compress,
@@ -282,13 +290,15 @@ ENDJS
                 } );
     $sorter->finish();
 
+    $trackConfig->{key} = $tableName unless $trackConfig->{key} = $keys->[$count++];
+    
     my $curChrom;
     my $gdb = GenomeDB->new($outdir);
-    my $track = $gdb->getTrack($tableName, $trackConfig, $trackConfig->{shortLabel} );
+    my $track = $gdb->getTrack($tableName, $trackConfig, $trackConfig->{key} );
     unless (defined($track)) {
         $track = $gdb->createFeatureTrack($tableName,
                                           $trackConfig,
-                                          $trackConfig->{shortLabel});
+                                          $trackConfig->{key});
     }
     my $nameHandler;
     while (1) {
