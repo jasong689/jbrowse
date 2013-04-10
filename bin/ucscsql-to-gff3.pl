@@ -5,21 +5,52 @@ use DBI;
 use Getopt::Long;
 use Bio::GFF3::LowLevel qw/ gff3_format_feature /;
 
-=usage
+=head1 NAME
 
-ucsc-to-json.pl
+ucsc-to-json.pl - queries UCSC MySQL database and formats data into GFF3
+
+=head1 DESCRIPTION
 
 Queries UCSC public MySQL and creates a GFF3 file based on the options below. Can combine data from
 two separate tables, however the first table must contain track data.
 
-Options:
+=head1 USAGE
 
-    --primaryTable <table name>
-    --secondaryTable <table name>
-    --link <primaryTable column> <secondaryTable column>
-    --primaryName <column name>
-    --out <dir>
+	--primaryTable <tableName>
+	--secondaryTable <tableName>
+	--link <primaryTable field> <secondaryTable field>
+	--primaryName <fieldName>
+	--out <dir>
 
+=head1 OPTIONS
+
+=over4
+
+=item --primaryTable <tableName>
+
+Primary table which contains track data
+
+=item --scondaryTable <tableName>
+
+Second table with data to be added to the GFF3 file
+
+=item --link <primaryTable field> <secondaryTable field>
+
+Condition to link the two tables
+
+=item --primaryName <fieldName>
+
+If used will switch columns used to display feature
+
+=item --out <dir>
+
+Output directory for GFF3 file
+
+=head1 EXAMPLE
+
+Example:
+
+	ucscsql-to-gff3.pl --primaryTable knownGene --secondaryTable kgXref --link name kgID    
 
 =cut
 
