@@ -4,6 +4,12 @@ use strict;
 use Getopt::Long;
 use JSON;
 
+#creates a JSON file for multiple alignment tracks from the 1000 Genomes Project
+#output file name: bamTracks.json
+#use add-track-json.pl to add bamTracks.json to trackList.json with the following syntax: perl add-track-json.pl bamTracks.json ../data/trackList.json
+#added to JBrowse in March 2013
+#by Chevonne Lewis of Seneca College
+
 my %population;
 my %genome_centre;
 my %individuals;
@@ -20,8 +26,6 @@ $inDir .= "/" unless $inDir =~ /\/$/;
 
 open META, "$metaDir" or die "Unable to open metadata file: $!";
 my @meta = <META>;
-
-#create a hash containing population acronyms and their names and another hash containing the genome centres and their acronyms
 my @general = splice @meta, 0, 21;
 foreach (@general) {
     $_ =~ s/\r//g;
