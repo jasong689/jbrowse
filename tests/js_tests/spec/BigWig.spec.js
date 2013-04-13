@@ -1,7 +1,17 @@
-require(['JBrowse/Store/BigWig','JBrowse/Model/XHRBlob'], function( BigWig, XHRBlob ) {
+require([
+            'JBrowse/Browser',
+            'JBrowse/Store/BigWig',
+            'JBrowse/Model/XHRBlob'
+        ], function(
+            Browser,
+            BigWig,
+            XHRBlob
+        ) {
 
     describe( 'BigWig with volvox_microarray.bw', function() {
+        var browser = new Browser({ unitTestMode: true });
         var b = new BigWig({
+            browser: browser,
             blob: new XHRBlob('../../sample_data/raw/volvox/volvox_microarray.bw')
         });
         it('constructs', function(){ expect(b).toBeTruthy(); });
@@ -21,7 +31,7 @@ require(['JBrowse/Store/BigWig','JBrowse/Model/XHRBlob'], function( BigWig, XHRB
         it('reads some good data unzoomed', function() {
             var v = b.getUnzoomedView();
             var wigData;
-            v.readWigData( 'ctgA', 0, 10000, function(features) {
+            v.readWigData( browser.regularizeReferenceName('ctgA'), 0, 10000, function(features) {
                 wigData = features;
             });
             waitsFor(function() { return wigData; },1000);
@@ -38,7 +48,7 @@ require(['JBrowse/Store/BigWig','JBrowse/Model/XHRBlob'], function( BigWig, XHRB
         it('reads some good data when zoomed out', function() {
             var v = b.getView( 1/20000 );
             var wigData;
-            v.readWigData( 'ctgA', 100, 20000, function(features) {
+            v.readWigData( browser.regularizeReferenceName('ctgA'), 100, 20000, function(features) {
                 wigData = features;
             });
             waitsFor(function() { return wigData; },500);
@@ -73,7 +83,7 @@ require(['JBrowse/Store/BigWig','JBrowse/Model/XHRBlob'], function( BigWig, XHRB
         it('reads good data when zoomed very little', function() {
             var v = b.getView( 1/17.34 );
             var wigData;
-            v.readWigData( 'ctgA', 19999, 24999, function(features) {
+            v.readWigData( browser.regularizeReferenceName('ctgA'), 19999, 24999, function(features) {
                 wigData = features;
             });
             waitsFor(function() { return wigData; },1000);
@@ -95,6 +105,7 @@ require(['JBrowse/Store/BigWig','JBrowse/Model/XHRBlob'], function( BigWig, XHRB
 
         describe( 'BigWig with tomato RNAseq coverage', function() {
                       var b = new BigWig({
+                                             browser: new Browser({ unitTestMode: true }),
                                              blob: new XHRBlob('../data/SL2.40_all_rna_seq.v1.bigwig')
                                          });
 

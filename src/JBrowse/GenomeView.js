@@ -922,9 +922,11 @@ GenomeView.prototype.dragMove = function(event) {
 // Similar to "dragMove". Consider merging.
 GenomeView.prototype.verticalDragMove = function(event) {
     this.dragging = true;
+    var containerHeight = parseInt(this.verticalScrollBar.container.style.height,10);
+    var trackContainerHeight = this.trackContainer.clientHeight;
      this.setPosition({
          x: this.winStartPos.x,
-         y: this.winStartPos.y + (event.clientY - this.dragStartPos.y)
+         y: this.winStartPos.y + (event.clientY - this.dragStartPos.y)*(trackContainerHeight/containerHeight)
          });
     dojo.stopEvent(event);
 };
@@ -1102,11 +1104,16 @@ GenomeView.prototype.showCoarse = function() {
 /**
  * Hook for other components to dojo.connect to.
  */
-GenomeView.prototype.onFineMove = function( startbp, endbp ) {};
+GenomeView.prototype.onFineMove = function( startbp, endbp ) {
+    this.updateLocationThumb();
+};
+
 /**
  * Hook for other components to dojo.connect to.
  */
-GenomeView.prototype.onCoarseMove = function( startbp, endbp ) {};
+GenomeView.prototype.onCoarseMove = function( startbp, endbp ) {
+    this.updateLocationThumb();
+};
 
 /**
  * Hook to be called on a window resize.
@@ -1265,6 +1272,27 @@ GenomeView.prototype.thumbMoved = function(mover) {
     var pxWidth = parseInt(this.locationThumb.style.width);
     var pxCenter = pxLeft + (pxWidth / 2);
     this.centerAtBase(((pxCenter / this.overviewBox.w) * (this.ref.end - this.ref.start)) + this.ref.start);
+};
+
+/**
+ * Updates the position of the red box in the overview that indicates
+ * the region being shown by the detail pane.
+ */
+GenomeView.prototype.updateLocationThumb = function() {
+    var startbp = this.minVisible();
+    var endbp = this.maxVisible();
+
+    var length = this.ref.end - this.ref.start;
+    var trapLeft = Math.round((((startbp - this.ref.start) / length)
+                               * this.overviewBox.w) + this.overviewBox.l);
+    var trapRight = Math.round((((endbp - this.ref.start) / length)
+                                * this.overviewBox.w) + this.overviewBox.l);
+
+    this.locationThumb.style.cssText =
+    "height: " + (this.overviewBox.h - 4) + "px; "
+    + "left: " + trapLeft + "px; "
+    + "width: " + (trapRight - trapLeft) + "px;"
+    + "z-index: 20";
 };
 
 GenomeView.prototype.checkY = function(y) {
@@ -1742,6 +1770,7 @@ GenomeView.prototype._unsetPosBeforeZoom = function() {
 GenomeView.prototype.zoomUpdate = function(zoomLoc, fixedBp) {
     var eWidth = this.elem.clientWidth;
     var centerPx = this.bpToPx(fixedBp) - (zoomLoc * eWidth) + (eWidth / 2);
+    // stripeWidth: pixels per block
     this.stripeWidth = this.stripeWidthForZoom(this.curZoom);
     this.scrollContainer.style.width =
         (this.stripeCount * this.stripeWidth) + "px";
@@ -2030,17 +2059,14 @@ GenomeView.prototype.renderTrack = function( /**Object*/ trackConfig ) {
 
         // if we can, check that the current reference sequence is
         // contained in the store
-        if( store.getRefSeqs ) {
-            var foundRef, curRefName = this.ref.name;
-            store.getRefSeqs(
-                function( ref ) {
-                    foundRef = foundRef || ref.name == curRefName;
-                },
-                function() {
+        if( store.hasRefSeq ) {
+            store.hasRefSeq(
+                this.ref.name,
+                function( foundRef ) {
                     if( ! foundRef )
                         new InfoDialog({
                             title: 'Reference warning',
-                            content: 'WARNING: The data for track "'
+                            content: 'WARNING: The data store for track "'
                               +(trackConfig.key||trackConfig.label)
                               +'" contains no data for the current'
                               +' reference sequence ('
@@ -2114,8 +2140,11 @@ GenomeView.prototype.updateTrackList = function() {
     var containerChild = this.trackContainer.firstChild;
     do {
         // this test excludes UI tracks, whose divs don't have a track property
-        if (containerChild.track) tracks.push(containerChild.track);
+        if (containerChild.track)
+            tracks.push(containerChild.track);
     } while ((containerChild = containerChild.nextSibling));
+
+    var oldTracks = this.tracks;
     this.tracks = tracks;
 
     var newIndices = {};
@@ -2131,6 +2160,15 @@ GenomeView.prototype.updateTrackList = function() {
         totalHeight += newHeights[i];
         this.trackIndices[tracks[i].name] = i;
     }
+
+    // call destroy on any tracks that are being thrown out
+    array.forEach( oldTracks || [], function( track ) {
+        if( ! ( track.name in newIndices ) ) {
+            delete track.div.track; //< because this file put it there
+            track.destroy();
+        }
+    }, this );
+
     this.trackIndices = newIndices;
     this.trackHeights = newHeights;
     var nextTop = this.topSpace;

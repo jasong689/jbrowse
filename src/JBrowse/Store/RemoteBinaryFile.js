@@ -1,7 +1,7 @@
 define([
            'dojo/_base/declare',
            'dojo/_base/array',
-           'dojo/has',
+           'JBrowse/has',
            'JBrowse/Store/LRUCache',
            'jszlib/arrayCopy'
        ],
@@ -241,7 +241,7 @@ return declare( null,
                             var r = req.responseText;
                             if (length && length != r.length && (!truncatedLength || r.length != truncatedLength)) {
                                 if( attempt == 3 ) {
-                                    callback( null, req.status+' ('+req.statusText+') when attempting to fetch '+url );
+                                    callback( null, this._errorString( req, url ) );
                                 } else {
                                     this._fetch( request, callback, attempt + 1, r.length );
                                 }
@@ -263,7 +263,7 @@ return declare( null,
                         callback( response );
                     }
                 } else if( attempt == 3 ) {
-                    callback( null, req.status+' ('+req.statusText+') when attempting to fetch '+url );
+                    callback( null, this._errorString( req, url ) );
                     return null;
                 } else {
                     return this._fetch( request, callback, attempt + 1);
@@ -275,6 +275,13 @@ return declare( null,
         //     req.withCredentials = true;
         //  }
         req.send('');
+    },
+
+    _errorString: function( req, url ) {
+        if( req.status )
+            return req.status+' ('+req.statusText+') when attempting to fetch '+url;
+        else
+            return 'Unable to fetch '+url;
     },
 
     /**
@@ -327,7 +334,7 @@ return declare( null,
 
         var returnBuffer;
 
-        if( ! Uint8Array ) {
+        if( ! has('typed-arrays') ) {
             failureCallback( 'Browser does not support typed arrays');
             return;
         }

@@ -3,17 +3,33 @@ define( [
             'dojo/_base/array',
             'dojo/_base/Deferred',
             'dojo/_base/lang',
+            'JBrowse/has',
             'JBrowse/Util',
             'JBrowse/Store/SeqFeature',
             'JBrowse/Store/DeferredStatsMixin',
             'JBrowse/Store/DeferredFeaturesMixin',
             'JBrowse/Model/XHRBlob',
+            'JBrowse/Store/SeqFeature/GlobalStatsEstimationMixin',
             './BAM/Util',
             './BAM/File'
         ],
-        function( declare, array, Deferred, lang, Util, SeqFeatureStore, DeferredStatsMixin, DeferredFeaturesMixin, XHRBlob, BAMUtil, BAMFile ) {
+        function(
+            declare,
+            array,
+            Deferred,
+            lang,
+            has,
+            Util,
+            SeqFeatureStore,
+            DeferredStatsMixin,
+            DeferredFeaturesMixin,
+            XHRBlob,
+            GlobalStatsEstimationMixin,
+            BAMUtil,
+            BAMFile
+        ) {
 
-var BAMStore = declare( [ SeqFeatureStore, DeferredStatsMixin, DeferredFeaturesMixin ],
+var BAMStore = declare( [ SeqFeatureStore, DeferredStatsMixin, DeferredFeaturesMixin, GlobalStatsEstimationMixin ],
 
 /**
  * @lends JBrowse.Store.SeqFeature.BAM
@@ -29,24 +45,17 @@ var BAMStore = declare( [ SeqFeatureStore, DeferredStatsMixin, DeferredFeaturesM
 
         this.createSubfeatures = args.subfeatures;
 
-        var bamBlob = args.bam || (function() {
-                                       var url = Util.resolveUrl(
-                                           args.baseUrl || '/',
-                                           Util.fillTemplate( args.urlTemplate || 'data.bam',
-                                           {'refseq': (this.refSeq||{}).name }
-                                                            )
-                                       );
-                                       return new XHRBlob( url );
-                                   }).call(this);
-        var baiBlob = args.bai || (function() {
-                                      var url = Util.resolveUrl(
-                                          args.baseUrl || '/',
-                                          Util.fillTemplate( args.baiUrlTemplate || args.urlTemplate+'.bai' || 'data.bam.bai',
-                                                             {'refseq': (this.refSeq||{}).name }
-                                                           )
-                                      );
-                                      return new XHRBlob( url );
-                                  }).call(this);
+        var bamBlob = args.bam ||
+            new XHRBlob( this.resolveUrl(
+                             args.urlTemplate || 'data.bam'
+                         )
+                       );
+
+        var baiBlob = args.bai ||
+            new XHRBlob( this.resolveUrl(
+                             args.baiUrlTemplate || ( args.urlTemplate ? args.urlTemplate+'.bai' : 'data.bam.bai' )
+                         )
+                       );
 
         this.bam = new BAMFile({
                 store: this,
@@ -57,12 +66,18 @@ var BAMStore = declare( [ SeqFeatureStore, DeferredStatsMixin, DeferredFeaturesM
         this.source = ( bamBlob.url  ? bamBlob.url.match( /\/([^/\#\?]+)($|[\#\?])/ )[1] :
                         bamBlob.blob ? bamBlob.blob.name : undefined ) || undefined;
 
+        if( ! has( 'typed-arrays' ) ) {
+            this._failAllDeferred( 'Browser does not support typed arrays');
+            return;
+        }
+
         this.bam.init({
             success: dojo.hitch( this, '_estimateGlobalStats',
-                                 dojo.hitch( this, function(error) {
+                                 dojo.hitch( this, function( stats, error ) {
                                      if( error )
                                          this._failAllDeferred( error );
                                      else {
+                                         this.globalStats = stats;
                                          this._deferred.stats.resolve({success:true});
                                          this._deferred.features.resolve({success:true});
                                      }
@@ -73,64 +88,20 @@ var BAMStore = declare( [ SeqFeatureStore, DeferredStatsMixin, DeferredFeaturesM
     },
 
     /**
-     * Fetch the list of reference sequences represented in the store.
+     * Interrogate whether a store has data for a given reference
+     * sequence.  Calls the given callback with either true or false.
+     *
+     * Implemented as a binary interrogation because some stores are
+     * smart enough to regularize reference sequence names, while
+     * others are not.
      */
-    getRefSeqs: function( seqCallback, finishCallback, errorCallback ) {
+    hasRefSeq: function( seqName, callback, errorCallback ) {
         var thisB = this;
+        seqName = thisB.browser.regularizeReferenceName( seqName );
         this._deferred.stats.then( function() {
-            array.forEach( thisB.bam.indexToChr || [], function( rec ) {
-                seqCallback({ name: rec.name, length: rec.length, start: 0, end: rec.length });
-            });
-            finishCallback();
+            callback( seqName in thisB.bam.chrToIndex );
         }, errorCallback );
     },
-
-    /**
-     * Fetch a region of the current reference sequence and use it to
-     * estimate the feature density in the BAM file.
-     * @private
-     */
-    _estimateGlobalStats: function( finishCallback ) {
-
-        var statsFromInterval = function( refSeq, length, callback ) {
-            var sampleCenter = refSeq.start*0.75 + refSeq.end*0.25;
-            var start = Math.max( 0, Math.round( sampleCenter - length/2 ) );
-            var end = Math.min( Math.round( sampleCenter + length/2 ), refSeq.end );
-            this.bam.fetch( refSeq.name, start, end, dojo.hitch( this, function( features, error) {
-                if ( error ) {
-                    console.error( error );
-                    callback.call( this, length,  null, error );
-                }
-                else if( features ) {
-                    features = array.filter( features, function(f) { return f.get('start') >= start && f.get('end') <= end; } );
-                    callback.call( this, length,
-                                   {
-                                       featureDensity: features.length / length,
-                                       _statsSampleFeatures: features.length,
-                                       _statsSampleInterval: { ref: refSeq.name, start: start, end: end, length: length }
-                                   });
-                }
-            }));
-        };
-
-        var maybeRecordStats = function( interval, stats, error ) {
-            if( error ) {
-                finishCallback( error );
-            } else {
-                var refLen = this.refSeq.end - this.refSeq.start;
-                 if( stats._statsSampleFeatures >= 300 || interval * 2 > refLen || error ) {
-                     this.globalStats = stats;
-                     console.log( 'BAM statistics: '+this.source, stats );
-                     finishCallback();
-                 } else {
-                     statsFromInterval.call( this, this.refSeq, interval * 2, maybeRecordStats );
-                 }
-            }
-        };
-
-        statsFromInterval.call( this, this.refSeq, 100, maybeRecordStats );
-    },
-
 
     // called by getFeatures from the DeferredFeaturesMixin
     _getFeatures: function( query, featCallback, endCallback, errorCallback ) {
@@ -164,7 +135,7 @@ var BAMStore = declare( [ SeqFeatureStore, DeferredStatsMixin, DeferredFeaturesM
                             if( i && !( i % maxFeaturesWithoutYielding ) ) {
                                 window.setTimeout( readFeatures, 1 );
                                 i++;
-                                break;
+                                return;
                             }
                         }
                         if( i >= features.length )

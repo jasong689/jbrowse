@@ -1,12 +1,13 @@
 define( [
             'dojo/_base/declare',
             'dojo/_base/array',
+            'JBrowse/has',
             'JBrowse/Util',
             'JBrowse/Store/LRUCache',
             './Util',
             './LazyFeature'
         ],
-        function( declare, array, Util, LRUCache, BAMUtil, BAMFeature ) {
+        function( declare, array, has, Util, LRUCache, BAMUtil, BAMFeature ) {
 
 var BAM_MAGIC = 21840194;
 var BAI_MAGIC = 21578050;
@@ -103,7 +104,7 @@ var BamFile = declare( null,
                 return;
             }
 
-            if( ! Uint8Array ) {
+            if( ! has('typed-arrays') ) {
                 dlog('Browser does not support typed arrays');
                 failCallback('Browser does not support typed arrays');
                 return;
@@ -206,15 +207,10 @@ var BamFile = declare( null,
                         for (var j = 0; j < lName-1; ++j) {
                             name += String.fromCharCode(uncba[p + 4 + j]);
                         }
+
                         var lRef = readInt(uncba, p + lName + 4);
                         // dlog(name + ': ' + lRef);
-                        thisB.chrToIndex[name] = i;
-                        if (name.indexOf('chr') == 0) {
-                            thisB.chrToIndex[name.substring(3)] = i;
-                        } else {
-                            thisB.chrToIndex['chr' + name] = i;
-                        }
-
+                        thisB.chrToIndex[ thisB.store.browser.regularizeReferenceName( name ) ] = i;
                         thisB.indexToChr.push({ name: name, length: lRef });
 
                         p = p + 8 + lName;
@@ -322,6 +318,8 @@ var BamFile = declare( null,
 
     fetch: function(chr, min, max, callback) {
 
+        chr = this.store.browser.regularizeReferenceName( chr );
+
         var chrId = this.chrToIndex && this.chrToIndex[chr];
         var chunks;
         if( !( chrId >= 0 ) ) {
@@ -363,7 +361,6 @@ var BamFile = declare( null,
             return;
         }
 
-        var features = [];
         var chunksProcessed = 0;
 
         var cache = this.featureCache = this.featureCache || new LRUCache({
@@ -372,16 +369,18 @@ var BamFile = declare( null,
             sizeFunction: function( features ) {
                 return features.length;
             },
-            maxSize: 100000 // cache up to 100,000 BAM features
+            maxSize: 300000 // cache up to 300,000 BAM features
         });
 
         var error;
+        var chunkFeatures = [];
         array.forEach( chunks, function( c ) {
             cache.get( c, function( f, e ) {
                 error = error || e;
-                features.push.apply( features, f );
-                if( ++chunksProcessed == chunks.length )
-                    callback( features, error );
+                chunkFeatures.push( f );
+                if( ++chunksProcessed == chunks.length ) {
+                    callback( chunkFeatures[0].concat.apply( chunkFeatures[0], chunkFeatures.slice(1)), error );
+                }
             });
         });
 
