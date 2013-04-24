@@ -237,12 +237,20 @@ foreach my $tableName (@$tracks) {
        if defined($subfeatureClasses);
     $trackConfig->{style}->{arrowheadClass} = $arrowheadClass
       if defined($arrowheadClass);
-    $trackConfig->{style} = {
-                             %{$trackConfig->{style}},
-                             # TODO: break out legacy combined config
-                             $json->decode($clientConfig)
-                            }
-        if defined($clientConfig);
+    my $decodedClient = $json->decode($clientConfig) if defined($clientConfig);
+    unless ($decodedClient->{metadata}) {
+        $trackConfig->{style} = {
+                                 %{$trackConfig->{style}},
+                                 # TODO: break out legacy combined config
+                                 #$json->decode($clientConfig)
+                                 $decodedClient
+                                }
+            if defined($clientConfig);
+    } else {
+        $trackConfig->{metadata} = $decodedClient->{metadata};
+        delete $decodedClient->{metadata};
+        $trackConfig->{style} = { %{$trackConfig->{style}}, $decodedClient};
+    }
 
     if ($subfeatures) {
         $trackConfig->{style}->{className} = "generic_parent";
