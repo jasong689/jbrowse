@@ -1,4 +1,4 @@
-#!/usr/bin/perl;
+#!/usr/bin/perl
 use warnings;
 use strict;
 use Getopt::Long;
@@ -86,6 +86,7 @@ foreach my $t (@data) {
         closedir HG;
         foreach (@chrom) {
             if ($_ =~ /\.bam$/) {
+                next unless $_ =~ /\.mapped\./;
                 my %style = ( className => "alignment",
                              arrowheadClass => "arrowhead",
                              labelScale => 100);
@@ -104,14 +105,15 @@ foreach my $t (@data) {
                             omniGenome => $individuals{$t}->[12],
                             axiomGenome => $individuals{$t}->[13],
                             aligned => $individuals{$t}->[14],
-                            exomeTargetsCovered => $individuals{$t}->[15]
+                            exomeTargetsCovered => $individuals{$t}->[15],
+                            source => "1000 genomes alignments"
                             );
                 my $json = { urlTemplate => "http://54.235.177.158//1000genomes/data/$t/alignment/$_",
                             label => $_,
                             type => "Alignments2",
                             key => $_,
                             style => \%style,
-                            metadata => \%meta
+                            metadata => \%meta,
                             };
                 my $jsonText = to_json($json);
                 print $file "$jsonText,\n";
