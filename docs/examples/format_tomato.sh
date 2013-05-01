@@ -6,6 +6,11 @@
 IN='sample_data/raw/tomato';
 OUT='sample_data/json/tomato';
 
+# uncomment the line below to compress all the datasets on disk
+# (requires a little bit of web server configuration for the files to
+# be served correctly)
+#COMPRESS='--compress'
+
 set -e;
 rm -rf $OUT;
 mkdir -p $IN $OUT;
@@ -22,11 +27,13 @@ for f in ITAG2.3_assembly.gff3        \
     fi
 done
 
+set -x;
+
 # format the reference sequences
-bin/prepare-refseqs.pl --compress --fasta $IN/ITAG2.3_genomic.fasta --out $OUT;
+bin/prepare-refseqs.pl $COMPRESS --fasta $IN/ITAG2.3_genomic.fasta --out $OUT;
 
 # official ITAG2.3 gene models
-bin/flatfile-to-json.pl --compress \
+bin/flatfile-to-json.pl $COMPRESS \
     --out $OUT \
     --gff $IN/ITAG2.3_gene_models.gff3 \
     --type mRNA \
@@ -35,13 +42,13 @@ bin/flatfile-to-json.pl --compress \
     --key 'Gene models' \
     --getSubfeatures    \
     --className transcript \
-    --subfeatureClasses '{"CDS": "transcript-CDS", "exon": "transcript-exon"}' \
+    --subfeatureClasses '{"CDS": "transcript-CDS", "exon": "hidden"}' \
     --arrowheadClass arrowhead \
     --urltemplate "http://solgenomics.net/search/quick?term={name}" \
     ;
 
 # SL2.40 assembly
-bin/flatfile-to-json.pl --compress  \
+bin/flatfile-to-json.pl $COMPRESS  \
     --out $OUT \
     --trackLabel assembly \
     --key 'Assembly' \
@@ -55,7 +62,7 @@ bin/flatfile-to-json.pl --compress  \
     ;
 
 # SGN unigene alignments
-bin/flatfile-to-json.pl --compress  \
+bin/flatfile-to-json.pl $COMPRESS  \
     --out $OUT \
     --trackLabel sgn_unigenes \
     --key 'SGN unigenes' \
@@ -70,7 +77,7 @@ bin/flatfile-to-json.pl --compress  \
     ;
 
 # microtom cDNA alignments
-bin/flatfile-to-json.pl --compress  \
+bin/flatfile-to-json.pl $COMPRESS  \
     --out $OUT \
     --trackLabel microtom_cdna \
     --key 'MicroTom full-length cDNAs' \
@@ -84,7 +91,7 @@ bin/flatfile-to-json.pl --compress  \
     ;
 
 # SGN marker sequences
-bin/flatfile-to-json.pl --compress  \
+bin/flatfile-to-json.pl $COMPRESS  \
     --out $OUT \
     --trackLabel sgn_markers \
     --key 'SGN markers' \

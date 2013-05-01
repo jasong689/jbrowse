@@ -124,7 +124,9 @@ return declare( [BlockBasedTrack,ExportMixin], {
 
                     finishCallback();
                 }),
-                dojo.hitch( this, 'fillBlockError', blockIndex, block )
+                dojo.hitch( this, function(e) {
+                    this._handleError( e, args );
+                })
             );
     },
 
@@ -145,10 +147,10 @@ return declare( [BlockBasedTrack,ExportMixin], {
         dom.empty( block.domNode );
 
         try {
-            dojo.create('canvas').getContext('2d').fillStyle = 'red';
+            document.createElement('canvas').getContext('2d').fillStyle = 'red';
         } catch( e ) {
             this.fatalError = 'This browser does not support HTML canvas elements.';
-            this.fillBlockError( blockIndex, block, this.fatalError );
+            this.showFatalError( this.fatalError );
             return;
         }
 
@@ -231,10 +233,7 @@ return declare( [BlockBasedTrack,ExportMixin], {
                           },
                           function(e) {
                               thisB.error = e;
-                              array.forEach( thisB.blocks, function( block, blockIndex ) {
-                                  if( block && block.domNode.parentNode )
-                                      thisB.fillBlockError( blockIndex, block );
-                              });
+                              thisB._handleError( e );
                           });
 
     },
@@ -324,6 +323,7 @@ return declare( [BlockBasedTrack,ExportMixin], {
                     zIndex: 15
                 }
         }, block.domNode );
+        var hideTimeout;
         dojo.forEach( [canvas,verticalLine,scoreDisplay], function(element) {
             this.own( on( element, 'mousemove', dojo.hitch(this,function(evt) {
                     var cPos = dojo.position(canvas);
@@ -343,25 +343,18 @@ return declare( [BlockBasedTrack,ExportMixin], {
             })));
         },this);
         this.own( on( block.domNode, 'mouseout', function(evt) {
-                var target = evt.srcElement || evt.target;
-                var evtParent = evt.relatedTarget || evt.toElement;
-                if( !target || !evtParent || target.parentNode != evtParent.parentNode) {
-                    scoreDisplay.style.display = 'none';
-                    verticalLine.style.display = 'none';
-                }
-        }));
-        this.own( on(this.browser.view.trackContainer, 'mousemove', function(evt) {
-                var cPos = dojo.position(canvas);
-                var y = evt.pageY - cPos.y;
-                if ( y < 0 || y > cPos.Height) {
-                    scoreDisplay.style.display = 'none';
-                    verticalLine.style.display = 'none';
-                }
+                          if( hideTimeout )
+                              window.clearTimeout( hideTimeout );
+                          hideTimeout = window.setTimeout( function() {
+                                                 scoreDisplay.style.display = 'none';
+                                                 verticalLine.style.display = 'none';
+                                             }, 50 );
         }));
     },
 
     _showPixelValue: function( scoreDisplay, score ) {
-        if( typeof score == 'number' ) {
+        var scoreType = typeof score;
+        if( scoreType == 'number' ) {
             // display the score with only 6
             // significant digits, avoiding
             // most confusion about the
@@ -370,7 +363,12 @@ return declare( [BlockBasedTrack,ExportMixin], {
             // parsed out of BigWig files
             scoreDisplay.innerHTML = parseFloat( score.toPrecision(6) );
             return true;
-        } else {
+        }
+        else if( scoreType == 'string' ) {
+            scoreDisplay.innerHTML = score;
+            return true;
+        }
+        else {
             return false;
         }
     },

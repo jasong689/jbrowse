@@ -21,13 +21,16 @@ return declare( null,
      * @param args.sizeFunction
      * @param args.keyFunction
      * @param args.name
+     * @param args.verbose
      * @constructs
      */
     constructor: function( args ) {
         this.fill = args.fillCallback;
         this.maxSize = args.maxSize || 1000000;
 
-        this.name = args.name || 'cache';
+        this.verbose = args.verbose;
+
+        this.name = args.name || 'LRUcache';
 
         this._size = args.sizeFunction || this._size;
         this._keyString = args.keyFunction || this._keyString;
@@ -123,8 +126,12 @@ return declare( null,
 
     _attemptFill: function( inKey, keyString, callback ) {
         if( this.fill ) {
-            var fillRecord = this._inProgressFills[ keyString ] || { callbacks: [], running: false };
+
+            var fillRecord = this._inProgressFills[ keyString ] =
+                this._inProgressFills[ keyString ] || { callbacks: [], running: false };
+
             fillRecord.callbacks.push( callback );
+
             if( ! fillRecord.running ) {
                 fillRecord.running = true;
                 this.fill( inKey, dojo.hitch( this, function( keyString, inKey, fillRecord, value, error ) {
@@ -144,7 +151,6 @@ return declare( null,
                                    }, this );
                 }, keyString, inKey, fillRecord ));
             }
-            this._inProgressFills[ keyString ] = fillRecord;
         }
         else {
             try {
@@ -204,7 +210,7 @@ return declare( null,
 
     _size: function( value ) {
         var type = typeof value;
-        if( type == 'object' ) {
+        if( type == 'object' && type !== null ) {
             var sizeType = typeof value.size;
             if( sizeType == 'number' ) {
                 return sizeType;
@@ -264,7 +270,8 @@ return declare( null,
     },
 
     _log: function() {
-        //console.log.apply( console, this._logf.apply(this,arguments) );
+        if( this.verbose )
+            console.log.apply( console, this._logf.apply(this,arguments) );
     },
     _warn: function() {
         console.warn.apply( console, this._logf.apply(this,arguments) );

@@ -2,6 +2,7 @@ define([
            'dojo/_base/declare',
            'dojo/_base/array',
            'JBrowse/Util',
+           'JBrowse/has',
            'dojo/dnd/move',
            'dojo/dnd/Source',
            'dijit/focus',
@@ -15,6 +16,7 @@ define([
            declare,
            array,
            Util,
+           has,
            dndMove,
            dndSource,
            dijitFocus,
@@ -191,7 +193,7 @@ var GenomeView = function( browser, elem, stripeWidth, refseq, zoomLevel ) {
         refSeq: this.ref
     });
     this.staticTrack.setViewInfo( this, function(height) {}, this.stripeCount,
-                                 this.scaleTrackDiv, undefined, this.stripePercent,
+                                 this.scaleTrackDiv, this.stripePercent,
                                  this.stripeWidth, this.pxPerBp,
                                  this.trackPadding);
     this.zoomContainer.appendChild(this.scaleTrackDiv);
@@ -206,7 +208,7 @@ var GenomeView = function( browser, elem, stripeWidth, refseq, zoomLevel ) {
                                            refSeq: this.ref
                                        });
     gridTrack.setViewInfo( this, function(height) {}, this.stripeCount,
-                          gridTrackDiv, undefined, this.stripePercent,
+                          gridTrackDiv, this.stripePercent,
                           this.stripeWidth, this.pxPerBp,
                           this.trackPadding);
     this.trackContainer.appendChild(gridTrackDiv);
@@ -991,6 +993,10 @@ GenomeView.prototype.setLocation = function(refseq, startbp, endbp) {
 
     this.pxPerBp = Math.min(this.getWidth() / (endbp - startbp), this.maxPxPerBp );
     this.curZoom = Util.findNearest(this.zoomLevels, this.pxPerBp);
+
+    if( has('inaccurate-html-layout') )
+        this.pxPerBp = this.zoomLevels[ this.curZoom ];
+
     if (Math.abs(this.pxPerBp - this.zoomLevels[this.zoomLevels.length - 1]) < 0.2) {
         //the cookie-saved location is in round bases, so if the saved
         //location was at the highest zoom level, the new zoom level probably
@@ -1563,12 +1569,16 @@ GenomeView.prototype.addOverviewTrack = function(track) {
     var heightUpdate = function(height) {
         view.updateOverviewHeight();
     };
-    track.setViewInfo( this, heightUpdate, this.overviewStripes, trackDiv,
-              undefined,
-              overviewStripePct,
-              this.overviewStripeBases,
-                      this.pxPerBp,
-                      this.trackPadding);
+    track.setViewInfo(
+        this,
+        heightUpdate,
+        this.overviewStripes,
+        trackDiv,
+        overviewStripePct,
+        this.overviewStripeBases,
+        this.pxPerBp,
+        this.trackPadding
+    );
     this.overview.appendChild(trackDiv);
     this.updateOverviewHeight();
 
@@ -2065,10 +2075,10 @@ GenomeView.prototype.renderTrack = function( /**Object*/ trackConfig ) {
                 function( foundRef ) {
                     if( ! foundRef )
                         new InfoDialog({
-                            title: 'Reference warning',
-                            content: 'WARNING: The data store for track "'
+                            title: 'No data',
+                            content: '<b>'
                               +(trackConfig.key||trackConfig.label)
-                              +'" contains no data for the current'
+                              +'</b> contains no data on this'
                               +' reference sequence ('
                               +thisB.ref.name
                               +').'
@@ -2164,7 +2174,7 @@ GenomeView.prototype.updateTrackList = function() {
     // call destroy on any tracks that are being thrown out
     array.forEach( oldTracks || [], function( track ) {
         if( ! ( track.name in newIndices ) ) {
-            delete track.div.track; //< because this file put it there
+            Util.removeAttribute( track.div, 'track' ); //< because this file put it there
             track.destroy();
         }
     }, this );

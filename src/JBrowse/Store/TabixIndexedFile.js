@@ -1,7 +1,9 @@
 define([
            'dojo/_base/declare',
            'dojo/_base/array',
+           'JBrowse/Util',
            'JBrowse/Store/LRUCache',
+           'JBrowse/Errors',
            'JBrowse/Model/XHRBlob',
            'JBrowse/Model/BGZip/BGZBlob',
            'JBrowse/Model/TabixIndex'
@@ -9,7 +11,9 @@ define([
        function(
            declare,
            array,
+           Util,
            LRUCache,
+           Errors,
            XHRBlob,
            BGZBlob,
            TabixIndex
@@ -18,9 +22,12 @@ define([
 return declare( null, {
 
     constructor: function( args ) {
+        this.browser = args.browser;
         this.index = new TabixIndex({ blob: new BGZBlob( args.tbi ), browser: args.browser } );
         this.data  = new BGZBlob( args.file );
         this.indexLoaded = this.index.load();
+
+        this.chunkSizeLimit = args.chunkSizeLimit || 15000000;
     },
 
     getLines: function( ref, min, max, itemCallback, finishCallback, errorCallback ) {
@@ -32,7 +39,6 @@ return declare( null, {
     },
 
     _fetch: function( ref, min, max, itemCallback, finishCallback, errorCallback ) {
-
         errorCallback = errorCallback || function(e) { console.error(e, e.stack); };
 
         var chunks = this.index.blocksForRange( ref, min, max);
@@ -46,34 +52,37 @@ return declare( null, {
             return this.join(', ');
         };
 
+        // check the chunks for any that are over the size limit.  if
+        // any are, don't fetch any of them
+        for( var i = 0; i<chunks.length; i++ ) {
+            var size = chunks[i].fetchedSize();
+            if( size > this.chunkSizeLimit ) {
+                errorCallback( new Errors.DataOverflow('Too much data. Chunk size '+Util.commifyNumber(size)+' bytes exceeds chunkSizeLimit of '+Util.commifyNumber(this.chunkSizeLimit)+'.' ) );
+                return;
+            }
+        }
+
         var fetchError;
         try {
-            this._fetchChunkData( chunks, function( items, error ) {
-                if( fetchError )
-                    return;
-
-                if( error ) {
-                    errorCallback( error );
-                } else {
-                    array.forEach( items, function(item) {
-                        if( !( item.end < min || item.start > max )
-                            && ( ref === undefined || item.ref == ref ) ) {
-                                itemCallback( item );
-                            }
-                    });
-                    finishCallback();
-                }
-            });
+            this._fetchChunkData(
+                chunks,
+                ref,
+                min,
+                max,
+                itemCallback,
+                finishCallback,
+                errorCallback
+            );
         } catch( e ) {
             errorCallback( e );
         }
     },
 
-    _fetchChunkData: function( chunks, callback ) {
+    _fetchChunkData: function( chunks, ref, min, max, itemCallback, endCallback, errorCallback ) {
         var thisB = this;
 
         if( ! chunks.length ) {
-            callback([]);
+            endCallback();
             return;
         }
 
@@ -89,13 +98,30 @@ return declare( null, {
             maxSize: 100000 // cache up to 100,000 items
         });
 
-        var error;
+        var regRef = this.browser.regularizeReferenceName( ref );
+
+        var haveError;
         array.forEach( chunks, function( c ) {
             cache.get( c, function( chunkItems, e ) {
-                error = error || e;
-                allItems.push.apply( allItems, chunkItems );
-                if( ++chunksProcessed == chunks.length )
-                    callback( allItems, error );
+                if( e && !haveError )
+                    errorCallback( e );
+                if(( haveError = haveError || e )) {
+                    return;
+                }
+
+                for( var i = 0; i< chunkItems.length; i++ ) {
+                    var item = chunkItems[i];
+                    if( item._regularizedRef == regRef ) {
+                        // on the right ref seq
+                        if( item.start > max ) // past end of range, can stop iterating
+                            break;
+                        else if( item.end >= min ) // must be in range
+                            itemCallback( item );
+                    }
+                }
+                if( ++chunksProcessed == chunks.length ) {
+                    endCallback();
+                }
             });
         });
     },
@@ -105,16 +131,24 @@ return declare( null, {
         var items = [];
 
         thisB.data.read(chunk.minv.block, chunk.maxv.block - chunk.minv.block + 1, function( data ) {
+            data = new Uint8Array(data);
+
+            // throw away the first (probably incomplete) line
+            var parseStart = array.indexOf( data, thisB._newlineCode, 0 ) + 1;
+
             try {
                 thisB.parseItems(
                     data,
-                    0,
+                    parseStart,
                     function(i) { items.push(i); },
                     function() { callback(items); }
                 );
             } catch( e ) {
                 callback( null, e );
             }
+        },
+        function(e) {
+            callback( null, e );
         });
     },
 
@@ -123,7 +157,7 @@ return declare( null, {
         var itemCount = 0;
 
         var maxItemsWithoutYielding = 300;
-        var parseState = { data: new Uint8Array(data), offset: blockStart };
+        var parseState = { data: data, offset: blockStart };
 
         while ( true ) {
             // if we've read no more than a certain number of items this cycle, read another one
@@ -174,6 +208,7 @@ return declare( null, {
         var fields = line.split( "\t" );
         var item = { // note: index column numbers are 1-based
             ref:   fields[this.index.columnNumbers.ref-1],
+            _regularizedRef: this.browser.regularizeReferenceName( fields[this.index.columnNumbers.ref-1] ),
             start: parseInt(fields[this.index.columnNumbers.start-1]),
             end:   parseInt(fields[this.index.columnNumbers.end-1]),
             fields: fields
@@ -184,12 +219,15 @@ return declare( null, {
     _newlineCode: "\n".charCodeAt(0),
 
     _getline: function( parseState ) {
-        var newlineIndex = array.indexOf( parseState.data, this._newlineCode, parseState.offset );
+        var data = parseState.data;
+        var newlineIndex = array.indexOf( data, this._newlineCode, parseState.offset );
 
         if( newlineIndex == -1 ) // no more lines
             return null;
 
-        var line = String.fromCharCode.apply( String, Array.prototype.slice.call( parseState.data, parseState.offset, newlineIndex ));
+        var line = '';
+        for( var i = parseState.offset; i < newlineIndex; i++ )
+            line += String.fromCharCode( data[i] );
         parseState.offset = newlineIndex+1;
         return line;
     }

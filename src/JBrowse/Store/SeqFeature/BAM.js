@@ -10,7 +10,6 @@ define( [
             'JBrowse/Store/DeferredFeaturesMixin',
             'JBrowse/Model/XHRBlob',
             'JBrowse/Store/SeqFeature/GlobalStatsEstimationMixin',
-            './BAM/Util',
             './BAM/File'
         ],
         function(
@@ -25,7 +24,6 @@ define( [
             DeferredFeaturesMixin,
             XHRBlob,
             GlobalStatsEstimationMixin,
-            BAMUtil,
             BAMFile
         ) {
 
@@ -60,14 +58,15 @@ var BAMStore = declare( [ SeqFeatureStore, DeferredStatsMixin, DeferredFeaturesM
         this.bam = new BAMFile({
                 store: this,
                 data: bamBlob,
-                bai: baiBlob
+                bai: baiBlob,
+                chunkSizeLimit: args.chunkSizeLimit
         });
 
         this.source = ( bamBlob.url  ? bamBlob.url.match( /\/([^/\#\?]+)($|[\#\?])/ )[1] :
                         bamBlob.blob ? bamBlob.blob.name : undefined ) || undefined;
 
         if( ! has( 'typed-arrays' ) ) {
-            this._failAllDeferred( 'Browser does not support typed arrays');
+            this._failAllDeferred( 'Web browser does not support typed arrays');
             return;
         }
 
@@ -82,7 +81,9 @@ var BAMStore = declare( [ SeqFeatureStore, DeferredStatsMixin, DeferredFeaturesM
                                          this._deferred.features.resolve({success:true});
                                      }
 
-                                 })),
+                                 }),
+                                 dojo.hitch( this, '_failAllDeferred' )
+                               ),
             failure: dojo.hitch( this, '_failAllDeferred' )
         });
     },
@@ -105,47 +106,7 @@ var BAMStore = declare( [ SeqFeatureStore, DeferredStatsMixin, DeferredFeaturesM
 
     // called by getFeatures from the DeferredFeaturesMixin
     _getFeatures: function( query, featCallback, endCallback, errorCallback ) {
-        var start = query.start;
-        var end   = query.end;
-
-        var maxFeaturesWithoutYielding = 300;
-        this.bam.fetch( this.refSeq.name, start, end, function( features, error) {
-                if ( error ) {
-                    console.error( 'error fetching BAM data: ' + error );
-                    if( errorCallback ) errorCallback( error );
-                    return;
-                }
-                if( features ) {
-                    var i = 0;
-                    var readFeatures = function() {
-                        for( ; i < features.length; i++ ) {
-                            var feature = features[i];
-                            // skip if this alignment is unmapped, or if it does not actually overlap this range
-                            if (! (feature.get('unmapped') || feature.get('end') <= start || feature.get('start') >= end) )
-                                try {
-                                    featCallback( feature );
-                                } catch(e) {
-                                    if( errorCallback )
-                                        errorCallback( e );
-                                    else
-                                        console.error( e, e.stack );
-                                    return;
-                                }
-
-                            if( i && !( i % maxFeaturesWithoutYielding ) ) {
-                                window.setTimeout( readFeatures, 1 );
-                                i++;
-                                return;
-                            }
-                        }
-                        if( i >= features.length )
-                            endCallback();
-                    };
-
-                    readFeatures();
-
-                }
-            });
+        this.bam.fetch( this.refSeq.name, query.start, query.end, featCallback, endCallback, errorCallback );
     }
 
 });

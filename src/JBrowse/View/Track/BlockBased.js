@@ -308,6 +308,7 @@ return declare( [Component,DetailsMixin,Destroyable],
             this.cleanupBlock( block );
         }, this);
         delete this.blocks;
+        delete this.div;
 
         this.inherited( arguments );
     },
@@ -395,14 +396,25 @@ return declare( [Component,DetailsMixin,Destroyable],
     },
 
     // generic handler for all types of errors
-    _handleError: function( error ) {
+    _handleError: function( error, viewArgs ) {
         console.error( ''+error, error.stack, error );
+
+        var errorContext = dojo.mixin( {}, error );
+        dojo.mixin( errorContext, viewArgs );
+
         var isObject = typeof error == 'object';
 
-        if( isObject && error instanceof Errors.TrackBlockTimeout )
-            this.fillBlockTimeout( error.blockIndex, error.block, error );
-        else if( isObject && error instanceof Errors.TrackBlockError )
-            this.fillBlockError( error.blockIndex, error.block, error );
+        if( isObject && error instanceof Errors.TimeOut && errorContext.block )
+            this.fillBlockTimeout( errorContext.blockIndex, errorContext.block, error );
+        else if( isObject && error instanceof Errors.DataOverflow ) {
+            if( errorContext.block )
+                this.fillTooManyFeaturesMessage( errorContext.blockIndex, errorContext.block, error );
+            else
+                array.forEach( this.blocks, function( block, blockIndex ) {
+                    if( block )
+                        this.fillTooManyFeaturesMessage( blockIndex, block, error );
+                },this);
+        }
         else {
             this.fatalError = error;
             this.showFatalError( error );
@@ -624,6 +636,7 @@ return declare( [Component,DetailsMixin,Destroyable],
     },
 
     fillMessage: function( blockIndex, block, message, class_ ) {
+        domConstruct.empty( block.domNode );
         var msgDiv = dojo.create(
             'div', {
                 className: class_ || 'message',
@@ -639,12 +652,13 @@ return declare( [Component,DetailsMixin,Destroyable],
      */
     updateStaticElements: function( /**Object*/ coords ) {
         this.window_info = dojo.mixin( this.window_info || {}, coords );
-        if( this.fatalErrorMessageElement )
-            dojo.style( this.fatalErrorMessageElement, {
-                            left: coords.x+this.window_info.width * 0.2 +'px',
-                            width: this.window_info.width * 0.6 + 'px'
-                        });
-        if( this.label )
+        if( this.fatalErrorMessageElement ) {
+            this.fatalErrorMessageElement.style.width = this.window_info.width * 0.6 + 'px';
+            if( 'x' in coords )
+                this.fatalErrorMessageElement.style.left = coords.x+this.window_info.width * 0.2 +'px';
+        }
+
+        if( this.label && 'x' in coords )
             this.label.style.left = coords.x+'px';
     },
 
@@ -839,10 +853,12 @@ return declare( [Component,DetailsMixin,Destroyable],
 
     _processMenuSpec: function( spec, context ) {
         for( var x in spec ) {
-            if( typeof spec[x] == 'object' )
-                spec[x] = this._processMenuSpec( spec[x], context );
-            else
-                spec[x] = this.template( context.feature, this._evalConf( context, spec[x], x ) );
+            if( spec.hasOwnProperty(x) ) {
+                if( typeof spec[x] == 'object' )
+                    spec[x] = this._processMenuSpec( spec[x], context );
+                else
+                    spec[x] = this.template( context.feature, this._evalConf( context, spec[x], x ) );
+            }
         }
         return spec;
     },
@@ -912,13 +928,13 @@ return declare( [Component,DetailsMixin,Destroyable],
             if( type == 'content' )
                 dialog.set( 'content', this._evalConf( context, spec.content, null ) );
 
-            delete context.dialog;
+            Util.removeAttribute( context, 'dialog' );
         }
         else if( type == 'bare' ) {
             dialog = new Dialog( dialogOpts );
             context.dialog = dialog;
             dialog.set( 'content', this._evalConf( context, spec.content, null ) );
-            delete context.dialog;
+            Util.removeAttribute( context, 'dialog' );
         }
         // open the link in a dialog with an iframe
         else if( type == 'iframe' ) {

@@ -195,6 +195,16 @@ div.vertical_scrollbar .vertical_position_marker {
     cursor: default;
 }
 
+div.locationTrapContainer {
+    position: absolute;
+    z-index: -11;
+    height: 100%;
+    width: 100%;
+    top: 0;
+    left: 0;
+    background-color: white;
+}
+
 div.locationTrap {
     position: absolute;
     z-index: -10;
@@ -272,6 +282,7 @@ div.block.height_overflow .height_overflow_message {
     width: 100%;
     font-weight: bold;
     text-align: center;
+    z-index: 2000;
 
     box-sizing: border-box;
     -moz-box-sizing: border-box;
@@ -716,12 +727,6 @@ input.nav {
     font-size: 9px !important;
 }
 
-.help_dialog {
-    font-size: 12px;
-    width: 70%;
-    overflow: auto;
-    z-index: 2000;
-}
 .help_dialog ul {
     padding-left: 0;
 }

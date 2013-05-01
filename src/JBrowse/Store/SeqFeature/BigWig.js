@@ -133,10 +133,13 @@ return declare([ SeqFeatureStore, DeferredFeaturesMixin, DeferredStatsMixin ],
                     console.warn("BigWig "+bwg.data.url+ " has no total summary data.");
             }
 
-            bwg._readChromTree(function() {
-                bwg._deferred.features.resolve({success: true});
-                bwg._deferred.stats.resolve({success: true});
-            });
+            bwg._readChromTree(
+                function() {
+                    bwg._deferred.features.resolve({success: true});
+                    bwg._deferred.stats.resolve({success: true});
+                },
+                dojo.hitch( bwg, '_failAllDeferred' )
+            );
         },
         dojo.hitch( this, '_failAllDeferred' )
        );
@@ -154,7 +157,7 @@ return declare([ SeqFeatureStore, DeferredFeaturesMixin, DeferredStatsMixin ],
     /**
      * @private
      */
-    _readChromTree: function(callback) {
+    _readChromTree: function( callback, errorCallback ) {
         var thisB = this;
         this.refsByNumber = {};
         this.refsByName = {};
@@ -170,7 +173,7 @@ return declare([ SeqFeatureStore, DeferredFeaturesMixin, DeferredStatsMixin ],
         this.data.slice( this.chromTreeOffset, udo - this.chromTreeOffset )
             .fetch(function(bpt) {
                        if( ! has('typed-arrays') ) {
-                           thisB._failAllDeferred( 'Browser does not support typed arrays' );
+                           thisB._failAllDeferred( 'Web browser does not support typed arrays' );
                            return;
                        }
                        var ba = new Uint8Array(bpt);
@@ -225,7 +228,7 @@ return declare([ SeqFeatureStore, DeferredFeaturesMixin, DeferredStatsMixin ],
                        bptReadNode(rootNodeOffset);
 
                        callback.call( thisB, thisB );
-            });
+            }, errorCallback );
     },
 
     /**

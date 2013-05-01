@@ -38,7 +38,7 @@ var RequestWorker = declare( null,
      * Explorer by Thomas Down.
      * @constructs
      */
-    constructor: function( window, chr, min, max, callback ) {
+    constructor: function( window, chr, min, max, callback, errorCallback ) {
         this.window = window;
         this.source = window.bwg.name || undefined;
 
@@ -49,6 +49,7 @@ var RequestWorker = declare( null,
         this.min = min;
         this.max = max;
         this.callback = callback;
+        this.errorCallback = errorCallback || function(e) { console.error( e, e.stack, arguments.caller ); };
     },
 
     cirFobRecur: function(offset, level) {
@@ -85,7 +86,7 @@ var RequestWorker = declare( null,
                                              }
                                          }
                                      }
-                                 }));
+                                 }), this.errorCallback );
     },
 
     cirFobRecur2: function(cirBlockData, offset, level) {
@@ -387,7 +388,7 @@ var RequestWorker = declare( null,
                                                 ++bi;
                                             }
                                             this.tramp();
-                                        }));
+                                        }), this.errorCallback );
             }
         }
     }

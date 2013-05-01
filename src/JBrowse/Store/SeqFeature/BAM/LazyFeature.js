@@ -222,7 +222,7 @@ var Feature = Util.fastDeclare(
         return this.data.length_on_ref;
     },
     _flags: function() {
-        return (this.data._flag_nc & 0xffff0000) >> 16;
+        return (this.get('_flag_nc') & 0xffff0000) >> 16;
     },
     end: function() {
         return this._get('start') + ( this._get('length_on_ref') || this._get('seq_length') || undefined );
@@ -235,28 +235,39 @@ var Feature = Util.fastDeclare(
         return ( this.file.indexToChr[ this._refID ] || {} ).name;
     },
 
+    _bin_mq_nl: function() {
+        with( this.bytes )
+            return readInt( byteArray, start + 12  );
+    },
+    _flag_nc: function() {
+        with( this.bytes )
+            return readInt( byteArray, start + 16 );
+    },
+    seq_length: function() {
+        with( this.bytes )
+            return readInt( byteArray, start + 20 );
+    },
+    _next_refid: function() {
+        with( this.bytes )
+            return readInt( byteArray, start + 24 );
+    },
+    _next_pos: function() {
+        with( this.bytes )
+            return readInt( byteArray, start + 28 );
+    },
+    template_length: function() {
+        with( this.bytes )
+            return readInt( byteArray, start + 32 );
+    },
+
     /**
-     * parse the core data: start, end, strand, etc
+     * parse the core data: ref ID and start
      */
     _coreParse: function() {
-        var byteArray = this.bytes.byteArray;
-        var dataStart = this.bytes.start+4;
-
-        var tempBytes = new Uint8Array( 32 );
-        for( var i = 0; i<32; i++ ) {
-            tempBytes[i] = byteArray[i+dataStart];
+        with( this.bytes ) {
+            this._refID      = readInt( byteArray, start + 4 );
+            this.data.start  = readInt( byteArray, start + 8 );
         }
-        var ints = new Int32Array( tempBytes.buffer );
-
-        var d = this.data;
-        this._refID        = ints[0];
-        d.start            = ints[1];
-        d._bin_mq_nl       = ints[2];
-        d._flag_nc         = ints[3];
-        d.seq_length       = ints[4];
-        d._next_refid      = ints[5];
-        d._next_pos        = ints[6];
-        d.template_length  = ints[7];
     },
 
     /**
