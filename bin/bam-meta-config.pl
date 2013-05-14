@@ -87,6 +87,8 @@ foreach my $t (@data) {
         foreach (@chrom) {
             if ($_ =~ /\.bam$/) {
                 next unless $_ =~ /\.mapped\./;
+                my @split = split /\./, $_;
+                my ($genome, $tech, $aligner, $coverage, $date) = ($split[0], $split[2], $split[3], $split[5], $split[6]);
                 my %style = ( className => "alignment",
                              arrowheadClass => "arrowhead",
                              labelScale => 100);
@@ -106,12 +108,16 @@ foreach my $t (@data) {
                             axiomGenome => $individuals{$t}->[13],
                             aligned => $individuals{$t}->[14],
                             exomeTargetsCovered => $individuals{$t}->[15],
-                            source => "1000 genomes alignments"
+                            source => "1000 genomes alignments",
+                            technology => $tech,
+                            aligner => $aligner,
+                            coverage => $coverage,
+                            date => $date
                             );
                 my $json = { urlTemplate => "http://54.235.177.158//1000genomes/data/$t/alignment/$_",
                             label => $_,
                             type => "Alignments2",
-                            key => $_,
+                            key => $genome . " alignment",
                             style => \%style,
                             metadata => \%meta,
                             };
