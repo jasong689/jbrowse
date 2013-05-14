@@ -52,6 +52,13 @@ do
     bin/ucsc-to-json.pl --in goldenPath/hg19/database --track "${in[0]}" --key "${in[1]}" --clientConfig '{ "metadata" : { "source" : "UCSC genome browser tracks" }}'
 done
 
+echo "Adding UCSC Gene and RGD QTL tracks\n"
+bin/ucscsql-to-gff3.pl --primaryTable knownGene --secondaryTable kgXref --link link kgID --primaryName geneSymbol --out .
+bin/flatfile-to-json.pl --gff knownGene.gff3 --key 'UCSC Gene'
+
+bin/ucscsql-to-gff3.pl --primaryTable rgdQtl --secondaryTable rgdQtlLink --link name name --out .
+bin/flatfile-to-json.pl --gff rgdQtl.gff3 --key 'Human RGD QTL'
+
 if [ -e /*bin/nginx || -e /usr/*bin/nginx ]
 then
     echo "Please setup nginx as a reverse proxy for 1000genomes at http://s3.amazonaws.com/1000genomes\n"
